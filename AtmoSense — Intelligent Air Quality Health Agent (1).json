@@ -1,0 +1,576 @@
+{
+  "name": "AtmoSense — Intelligent Air Quality Health Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=Belda"
+            },
+            {
+              "name": "units",
+              "value": "metric"
+            },
+            {
+              "name": "appid",
+              "value": "02d88390951654ce0315dded5dabf94d"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2496,
+        -16
+      ],
+      "id": "925f9b8b-b18c-4355-9fd1-43e657ebb662",
+      "name": "Fetch Weather"
+    },
+    {
+      "parameters": {
+        "url": "http://api.openweathermap.org/data/2.5/air_pollution",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "lat",
+              "value": "22.070757"
+            },
+            {
+              "name": "lon",
+              "value": "87.338417"
+            },
+            {
+              "name": "appid",
+              "value": "02d88390951654ce0315dded5dabf94d"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2272,
+        -16
+      ],
+      "id": "10fb82b8-335a-4484-b6fa-7dfbc3a098a9",
+      "name": "Fetch AQI"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weather = $('Fetch Weather').first().json;\nconst air = $('Fetch AQI').first().json;\n\nconst aqi = air.list[0].main.aqi;\nconst temp = Math.round(weather.main.temp);\n\nconst aqiLabel = {\n  1: \"Good\", 2: \"Fair\",\n  3: \"Moderate\", 4: \"Poor\", 5: \"Very Poor\"\n}[aqi];\n\nconst heatNote = temp >= 35 ? \" Heat alert.\" \n  : temp >= 30 ? \" Hot weather.\" : \"\";\n\nconst city = weather.name;\nconst humidity = weather.main.humidity;\nconst condition = weather.weather[0].description;\nconst date = new Date().toDateString();\n\nconst timestamp = new Date().toLocaleString('en-IN', {\n  timeZone: 'Asia/Kolkata'\n});\n\nreturn [{\n  json: {\n    city, temp, humidity,\n    condition, aqi, aqiLabel,\n    heatNote, date, timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2096,
+        0
+      ],
+      "id": "c185b063-4d65-468f-9eed-9ef45c17e107",
+      "name": "Merge & Analyze"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a83853fc-3d63-432c-a640-7e72889a9388",
+              "leftValue": "={{ $json.aqi }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1920,
+        0
+      ],
+      "id": "1d6a6a1a-1cef-4ecb-8a54-2886cb69033a",
+      "name": "AQI Risk Check"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Location: {{ $json.city }}, West Bengal, India\nDate: {{ $json.date }}\nTemperature: {{ $json.temp }}°C{{ $json.heatNote }}\nHumidity: {{ $json.humidity }}%\nWeather: {{ $json.condition }}\nAQI: {{ $json.aqi }}/5 — {{ $json.aqiLabel }} (Very Poor Air)\n\nGive 5 URGENT tips specific to Indian lifestyle.\nCover: mask type, specific Indian foods and drinks (Breakfast,Lunch, Tiffin, Dinner all food items decide as a nutrationist and prefer bengalee healthy food) for lung protection, \nwhen to go outside, water intake in litres, \none Ayurvedic or home remedy."
+            },
+            {
+              "role": "system",
+              "content": "You are a professional health advisor in India.\nYou understand Indian climate, food, and lifestyle.\nReply in exactly 5 bullet points using • symbol.\nEach bullet maximum 12 words.\nNo greetings. No conclusions. No extra text."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        -1760,
+        -96
+      ],
+      "id": "9bac2355-a9ff-4758-a89d-62ad11e2528c",
+      "name": "High AQI Tips",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Location: {{ $json.city }}, West Bengal, India\nDate: {{ $json.date }}\nTemperature: {{ $json.temp }}°C{{ $json.heatNote }}\nHumidity: {{ $json.humidity }}%\nWeather: {{ $json.condition }}\nAQI: {{ $json.aqi }}/5 — {{ $json.aqiLabel }}\n\nGive 5 practical daily health tips for Indian lifestyle.\nCover: best time for morning walk, \nspecific Indian seasonal foods, \nwater intake in litres, clothing suggestion, \none home remedy for this weather."
+            },
+            {
+              "role": "system",
+              "content": "You are a professional health advisor in India.\nYou understand Indian climate, food, and lifestyle.\nReply in exactly 5 bullet points using • symbol.\nEach bullet maximum 12 words.\nNo greetings. No conclusions. No extra text."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        -1760,
+        112
+      ],
+      "id": "74432887-60d0-49ce-b173-eea2935fde0e",
+      "name": "Normal AQI Tips",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "82f88c54-0ad1-4eea-a476-f4b01ddb34c5",
+              "name": "body",
+              "value": "=<div style=\"font-family:Arial,sans-serif;max-width:580px;margin:auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden\"><div style=\"background:linear-gradient(135deg,#0F6E56,#1a9e7a);padding:28px 32px\"><h1 style=\"color:#ffffff;margin:0;font-size:22px\">🌤 Daily Health & Weather Report</h1><p style=\"color:#b2ffe0;margin:6px 0 0;font-size:13px\">{{ $('Merge & Analyze').first().json.date }} — {{ $('Merge & Analyze').first().json.city }}</p></div><div style=\"padding:24px 32px;background:#ffffff\"><table style=\"width:100%;border-collapse:collapse;margin-bottom:20px\"><tr><td style=\"padding:10px 14px;background:#f0faf6;border-left:4px solid #0F6E56;font-weight:bold;color:#555;width:45%\">🌡 Temperature</td><td style=\"padding:10px 14px;font-size:16px;font-weight:bold;color:#0F6E56\">{{ $('Merge & Analyze').first().json.temp }}°C{{ $('Merge & Analyze').first().json.heatNote }}</td></tr><tr><td style=\"padding:10px 14px;background:#f5f5f5;border-left:4px solid #64b5f6;font-weight:bold;color:#555\">💧 Humidity</td><td style=\"padding:10px 14px;font-size:16px;font-weight:bold;color:#1565c0\">{{ $('Merge & Analyze').first().json.humidity }}%</td></tr><tr><td style=\"padding:10px 14px;background:#f0faf6;border-left:4px solid #81c784;font-weight:bold;color:#555\">🌤 Condition</td><td style=\"padding:10px 14px;font-size:16px;font-weight:bold;color:#2e7d32\">{{ $('Merge & Analyze').first().json.condition }}</td></tr><tr><td style=\"padding:10px 14px;background:#fff3e0;border-left:4px solid #ef5350;font-weight:bold;color:#555\">🍃 AQI Level</td><td style=\"padding:10px 14px;font-size:16px;font-weight:bold;color:#c62828\">{{ $('Merge & Analyze').first().json.aqi }}/5 ({{ $('Merge & Analyze').first().json.aqiLabel }})</td></tr></table><div style=\"background:#fff8e1;border-left:4px solid #f9a825;border-radius:6px;padding:16px 20px;margin-bottom:20px\"><h3 style=\"color:#f57f17;margin:0 0 12px;font-size:15px\">💊 Health Tips for Today</h3><p style=\"color:#4a4a4a;line-height:1.8;margin:0;white-space:pre-line\">{{ $json.output[0].content[0].text ?? $json.content[0].text ?? \"Tips unavailable\" }}</p></div><div style=\"background:#e8f5e9;border-radius:6px;padding:12px 16px;text-align:center\"><p style=\"color:#388e3c;font-size:12px;margin:0\">Stay healthy and take care! 🌿 Auto-generated by your n8n health agent.</p></div></div><div style=\"background:#f5f5f5;padding:12px 32px;text-align:center\"><p style=\"color:#aaa;font-size:11px;margin:0\">Powered by OpenWeatherMap + OpenAI + n8n</p></div></div>",
+              "type": "string"
+            },
+            {
+              "id": "ed79f257-b496-43ab-81ff-df2e6f5018b6",
+              "name": "whatsappMessage",
+              "value": "=🌤 *Daily Health Report*\n📍 {{ $('Merge & Analyze').first().json.city }}\n📅 {{ $('Merge & Analyze').first().json.date }}\n\n🌡 Temp: {{ $('Merge & Analyze').first().json.temp }}°C{{ $('Merge & Analyze').first().json.heatNote }}\n💧 Humidity: {{ $('Merge & Analyze').first().json.humidity }}%\n🌤 Condition: {{ $('Merge & Analyze').first().json.condition }}\n🍃 AQI: {{ $('Merge & Analyze').first().json.aqi }}/5 ({{ $('Merge & Analyze').first().json.aqiLabel }})\n\n💊 *Health Tips:*\n{{ $json.output[0].content[0].text ?? $json.content[0].text ?? \"Tips unavailable\" }}\n\n_🤖 AtmoSense AI — Auto-generated_",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1344,
+        16
+      ],
+      "id": "7f55f563-daa4-4260-ab15-a7fab30c1ac2",
+      "name": "Build Report"
+    },
+    {
+      "parameters": {
+        "sendTo": "arpan.chakraborty@codeclouds.in",
+        "subject": "Weather and AQI",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1136,
+        -336
+      ],
+      "id": "096da33c-d8d2-497c-8fcf-7ea40c3411e3",
+      "name": "Gamil Trigger",
+      "webhookId": "68e56b9a-3965-4b44-926d-912646d1f52c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FdpkkUovRY2yjvLH",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1DIvv3oCEQ5Q6teJNbJ_a_fDVdpl3sWkaiDX5iVgENhY",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1DIvv3oCEQ5Q6teJNbJ_a_fDVdpl3sWkaiDX5iVgENhY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ new Date().toDateString() }}",
+            "City": "={{ $('Merge & Analyze').first().json.city }}",
+            "Temp": "={{ $('Merge & Analyze').first().json.temp }}",
+            "Humidity": "={{ $('Merge & Analyze').first().json.humidity }}",
+            "Condition": "={{ $('Merge & Analyze').first().json.condition }}",
+            "AQI": "={{ $('Merge & Analyze').first().json.aqi }}",
+            "Timestamp": "={{ $('Merge & Analyze').first().json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "City",
+              "displayName": "City",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Temp",
+              "displayName": "Temp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Humidity",
+              "displayName": "Humidity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Condition",
+              "displayName": "Condition",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AQI",
+              "displayName": "AQI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1136,
+        -160
+      ],
+      "id": "aa347776-b0b2-4ad7-b585-e9f6848baed8",
+      "name": "Log to Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ju5w6amhlYknMk3T",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/1127029627162367/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAAdj4gO03LsBRnbihfreC5IvvzcCq7F31fvIIPEsa8Yec4ZCTS5szQtsFFdZBTsz9v5Y2y6JejSVtzNSPHbUjo1xXJ7GGEnCiT1kytevLk8cxbKU4MZAZCZCvxUjtAESZBbo8sKwpsArr8RU5MEYgvt7sTVb3PqX0XdDXBjsbPpUlRq1ekun3HZBTJP777DWwZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"917001971113\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.whatsappMessage.replace(/\\n/g, '\\\\n') }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1136,
+        16
+      ],
+      "id": "1d4c5ad4-0798-4afb-b43b-0c97d2c670c4",
+      "name": "WhatsApp Trigger"
+    },
+    {
+      "parameters": {
+        "content": "🌤 AtmoSense AI\nAutomated Daily Health & AQI Report System\n\nFLOW:\n1. Triggers at 6AM IST daily\n2. Fetches live weather + AQI from OpenWeather\n3. Checks AQI risk level (≥4 = High Risk)\n4. Generates personalized health tips via GPT\n5. Sends HTML report to Gmail\n6. Logs data to Google Sheets\n7. Sends WhatsApp alert\n\nStack: n8n · OpenWeatherMap · \nOpenAI GPT · Gmail · \nGoogle Sheets · WhatsApp API - Telegram Bot",
+        "height": 304,
+        "width": 368,
+        "color": "#05E6CC"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2192,
+        -368
+      ],
+      "id": "89218f2f-f443-4838-98a2-3a2808b165d1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2720,
+        -16
+      ],
+      "id": "2d3d76a9-7f5d-4169-abde-c502a28baf4b",
+      "name": "🕕 7AM Daily Trigger"
+    },
+    {
+      "parameters": {
+        "chatId": "7631722639",
+        "text": "={{ $json.whatsappMessage }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        192
+      ],
+      "id": "5cdaccc0-3c07-463f-8281-83f5e505062b",
+      "name": "Telegram Bot",
+      "webhookId": "490f9ed8-b7c8-485c-bced-caf2e927e8c0",
+      "credentials": {
+        "telegramApi": {
+          "id": "VpjoegSNleuDu5Mj",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fetch Weather": {
+      "main": [
+        [
+          {
+            "node": "Fetch AQI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch AQI": {
+      "main": [
+        [
+          {
+            "node": "Merge & Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Analyze": {
+      "main": [
+        [
+          {
+            "node": "AQI Risk Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AQI Risk Check": {
+      "main": [
+        [
+          {
+            "node": "High AQI Tips",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normal AQI Tips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High AQI Tips": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normal AQI Tips": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Gamil Trigger",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp Trigger",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🕕 7AM Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "9ae66abe-df5d-4245-acac-85fecac3990a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "64298e26a46387a7feb4063688d0cb2245bc14a6e42e7d971fc2967d4c118ede"
+  },
+  "id": "BCun81m8tWFgwdEW",
+  "tags": [
+    {
+      "name": "Arpan Chakraborty",
+      "id": "5L1OlbwyG23eIPRb",
+      "updatedAt": "2026-05-28T10:39:24.556Z",
+      "createdAt": "2026-05-28T10:39:24.556Z"
+    }
+  ]
+}
